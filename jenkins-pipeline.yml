@@ -1,0 +1,56 @@
+pipeline {
+    agent any
+    environment {
+        MAJOR_VERSION = 0
+        MINOR_VERSION = 0
+        PATCH_VERSION = 0
+        AWS_ACCOUNT_ID = "380605721532"
+        AWS_DEFAULT_REGION = "eu-west-2"
+        IMAGE_REPO_NAME = "fusion"
+        REPOSITORY_URI = "380605721532.dkr.ecr.eu-west-2.amazonaws.com/fusion"
+    }
+
+    stages {
+        stage('Logging into AWS ECR') {
+            steps {
+                script {
+                    sh "aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+                }
+            }
+        }
+
+        stage('Cloning Git') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[credentialsId: 'function', url: 'https://Fusion_Dev_Team@bitbucket.org/fusionteam6/ecr-release.git']]])
+            }
+        }
+
+        stage('Semantic Versioning') {
+            steps {
+                script {
+                    MAJOR_VERSION += 1
+                    MINOR_VERSION += 1
+                    PATCH_VERSION += 1
+                    VERSION = "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}"
+                }
+            }
+        }
+
+        stage('Building image') {
+            steps {
+                script {
+                    sh "docker build -t ${REPOSITORY_URI}:${VERSION} ."
+                }
+            }
+        }
+
+        stage('Pushing to ECR') {
+            steps {
+                script {
+                    sh "docker push ${REPOSITORY_URI}:${VERSION}"
+                }
+            }
+        }
+    }
+}
+
